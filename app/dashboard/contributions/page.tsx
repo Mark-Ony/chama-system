@@ -31,6 +31,8 @@ export default function ContributionsPage() {
   const [showModal, setShowModal] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [stkLoading, setStkLoading] = useState(false)
+const [stkMessage, setStkMessage] = useState('')
   const [form, setForm] = useState({
     member_id: '',
     amount: '',
@@ -47,6 +49,39 @@ export default function ContributionsPage() {
     setFiltered(data || [])
     setLoading(false)
   }
+  const triggerSTK = async () => {
+  if (!form.member_id || !form.amount) {
+    setError('Select member and enter amount first')
+    return
+  }
+
+  const member = members.find(m => m.id === form.member_id)
+  if (!member) return
+
+  setStkLoading(true)
+  setStkMessage('')
+
+  const res = await fetch('/api/mpesa/stk', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      phone: member.phone,
+      amount: form.amount,
+      memberId: form.member_id,
+      month: form.month
+    })
+  })
+
+  const data = await res.json()
+
+  if (data.success) {
+    setStkMessage('✅ M-Pesa prompt sent to member\'s phone!')
+  } else {
+    setStkMessage(`❌ ${data.error}`)
+  }
+
+  setStkLoading(false)
+}
 
   const fetchMembers = async () => {
     const { data } = await supabase.from('members').select('id, full_name, phone').eq('is_active', true)
@@ -81,32 +116,35 @@ export default function ContributionsPage() {
 
   const uniqueMonths = [...new Set(contributions.map(c => c.month))]
 
-  const handleSave = async () => {
-    if (!form.member_id || !form.amount || !form.mpesa_code) {
-      setError('All fields are required')
-      return
-    }
-    setSaving(true)
-    setError('')
+ const handleSave = async () => {
+  if (!form.member_id || !form.amount || !form.mpesa_code) {
+    setError('All fields are required')
+    return
+  }
+  setSaving(true)
+  setError('')
 
-    const { error } = await supabase.from('contributions').insert([{
+  const { data, error } = await supabase
+    .from('contributions')
+    .insert([{
       member_id: form.member_id,
       amount: parseFloat(form.amount),
       mpesa_code: form.mpesa_code.toUpperCase(),
       month: form.month,
       status: 'confirmed'
     }])
+    .select('*, members(full_name, phone)')
+    .single()
 
-    if (error) {
-      setError(error.message)
-      setSaving(false)
-      return
-    }
+  if (error) { setError(error.message); setSaving(false); return }
 
-    setSaving(false)
-    setShowModal(false)
-    setForm({ member_id: '', amount: '', mpesa_code: '', month: form.month })
-  }
+  // Add to local state immediately
+  setContributions(prev => [data, ...prev])
+
+  setSaving(false)
+  setShowModal(false)
+  setForm({ member_id: '', amount: '', mpesa_code: '', month: form.month })
+}
 
   const exportCSV = () => {
     const headers = ['Member', 'Phone', 'Amount', 'M-Pesa Code', 'Month', 'Date', 'Status']
@@ -287,6 +325,27 @@ export default function ContributionsPage() {
                   className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#4fbe63]"
                 />
               </div>
+              <button
+  onClick={triggerSTK}
+  disabled={stkLoading}
+  className="w-full flex items-center justify-center gap-2 bg-[#1a1a2e] hover:bg-[#2a2a4a] text-white py-2.5 rounded-xl text-sm font-semibold transition-all"
+>
+  {stkLoading ? (
+    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+  ) : (
+    '📱 Send M-Pesa Prompt to Phone'
+  )}
+</button>
+
+{stkMessage && (
+  <div className={`text-sm px-4 py-2.5 rounded-xl border ${
+    stkMessage.includes('✅')
+      ? 'bg-green-50 text-green-700 border-green-200'
+      : 'bg-red-50 text-red-600 border-red-200'
+  }`}>
+    {stkMessage}
+  </div>
+)}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">M-Pesa Code *</label>
                 <input

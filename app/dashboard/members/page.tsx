@@ -26,6 +26,8 @@ export default function MembersPage() {
   const [members, setMembers] = useState<Member[]>([])
   const [filtered, setFiltered] = useState<Member[]>([])
   const [search, setSearch] = useState('')
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [memberToDelete, setMemberToDelete] = useState<Member | null>(null)
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
@@ -105,35 +107,46 @@ export default function MembersPage() {
   }
 
   const handleSave = async () => {
-    if (!form.full_name || !form.phone) {
-      setError('Full name and phone are required')
-      return
-    }
-    setSaving(true)
-    setError('')
+  if (!form.full_name || !form.phone) {
+    setError('Full name and phone are required')
+    return
+  }
+  setSaving(true)
+  setError('')
 
-    if (selectedMember) {
-      const { error } = await supabase
-        .from('members')
-        .update(form)
-        .eq('id', selectedMember.id)
-      if (error) { setError(error.message); setSaving(false); return }
-    } else {
-      const { error } = await supabase
-        .from('members')
-        .insert([form])
-      if (error) { setError(error.message); setSaving(false); return }
-    }
+  if (selectedMember) {
+    const { data, error } = await supabase
+      .from('members')
+      .update(form)
+      .eq('id', selectedMember.id)
+      .select()
+      .single()
 
-    setSaving(false)
-    setShowModal(false)
+    if (error) { setError(error.message); setSaving(false); return }
+
+    // Update local state immediately
+    setMembers(prev => prev.map(m => m.id === selectedMember.id ? { ...m, ...form } : m))
+
+  } else {
+    const { data, error } = await supabase
+      .from('members')
+      .insert([form])
+      .select()
+      .single()
+
+    if (error) { setError(error.message); setSaving(false); return }
+
+    // Add to local state immediately
+    setMembers(prev => [data, ...prev])
   }
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this member?')) return
-    await supabase.from('members').delete().eq('id', id)
-  }
-
+  setSaving(false)
+  setShowModal(false)
+}
+const handleDelete = async (id: string) => {
+  setMembers(prev => prev.filter(m => m.id !== id))
+  await supabase.from('members').delete().eq('id', id)
+}
   const totalContributed = (memberId: string) => {
     return contributions.reduce((sum, c) => sum + c.amount, 0)
   }
@@ -242,13 +255,14 @@ export default function MembersPage() {
                       >
                         <Pencil size={15} />
                       </button>
-                      <button
-                        onClick={() => handleDelete(member.id)}
-                        className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                        title="Delete"
-                      >
-                        <Trash2 size={15} />
-                      </button>
+                                  <button
+              onClick={() => { setMemberToDelete(member); setShowDeleteModal(true) }}
+              className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+              title="Delete"
+            >
+              <Trash2 size={15} />
+            </button>
+            
                     </div>
                   </td>
                 </tr>
@@ -397,6 +411,42 @@ export default function MembersPage() {
           </div>
         </div>
       )}
+      {/* Delete Confirmation Modal */}
+{showDeleteModal && memberToDelete && (
+  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+      <div className="p-6 text-center">
+        <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <Trash2 size={28} className="text-red-500" />
+        </div>
+        <h3 className="text-lg font-bold text-gray-800 mb-1">Delete Member?</h3>
+        <p className="text-gray-500 text-sm mb-1">You are about to delete</p>
+        <p className="text-gray-800 font-semibold mb-1">{memberToDelete.full_name}</p>
+        <p className="text-gray-400 text-xs mb-6">
+          This will permanently remove the member and cannot be undone.
+        </p>
+        <div className="flex gap-3">
+          <button
+            onClick={() => { setShowDeleteModal(false); setMemberToDelete(null) }}
+            className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50 transition-all"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => {
+              handleDelete(memberToDelete.id)
+              setShowDeleteModal(false)
+              setMemberToDelete(null)
+            }}
+            className="flex-1 px-4 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-xl text-sm font-semibold transition-all"
+          >
+            Yes, Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
     </div>
   )
 }

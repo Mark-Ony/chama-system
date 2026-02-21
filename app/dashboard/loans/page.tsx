@@ -76,27 +76,35 @@ export default function LoansPage() {
     return total - loan.repaid_amount
   }
 
-  const handleApply = async () => {
-    if (!form.member_id || !form.amount || !form.due_date) {
-      setError('All fields are required')
-      return
-    }
-    setSaving(true)
-    setError('')
+const handleApply = async () => {
+  if (!form.member_id || !form.amount || !form.due_date) {
+    setError('All fields are required')
+    return
+  }
+  setSaving(true)
+  setError('')
 
-    const { error } = await supabase.from('loans').insert([{
+  const { data, error } = await supabase
+    .from('loans')
+    .insert([{
       member_id: form.member_id,
       amount: parseFloat(form.amount),
       interest_rate: parseFloat(form.interest_rate),
       due_date: form.due_date,
       status: 'pending'
     }])
+    .select('*, members(full_name, phone)')
+    .single()
 
-    if (error) { setError(error.message); setSaving(false); return }
-    setSaving(false)
-    setShowModal(false)
-    setForm({ member_id: '', amount: '', interest_rate: '10', due_date: '' })
-  }
+  if (error) { setError(error.message); setSaving(false); return }
+
+  // Add to local state immediately
+  setLoans(prev => [data, ...prev])
+
+  setSaving(false)
+  setShowModal(false)
+  setForm({ member_id: '', amount: '', interest_rate: '10', due_date: '' })
+}
 
   const handleApprove = async (id: string) => {
     await supabase.from('loans').update({
