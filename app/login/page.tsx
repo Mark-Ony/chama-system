@@ -46,7 +46,7 @@ export default function LoginPage() {
             <span className="text-white font-black text-3xl">C</span>
           </div>
           <h1 className="text-2xl font-bold text-gray-800">Chama System</h1>
-          <p className="text-gray-400 text-sm mt-1">Treasurer Login</p>
+          <p className="text-gray-400 text-sm mt-1">Treasurer or Admin Login</p>
         </div>
 
         {/* Form */}

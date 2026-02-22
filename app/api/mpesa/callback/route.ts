@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false })
     }
 
-    console.log(`✅ Payment saved: KES ${amount} from ${formattedPhone} — ${mpesaCode}`)
+    console.log(` Payment saved: KES ${amount} from ${formattedPhone} — ${mpesaCode}`)
     return NextResponse.json({ success: true })
 
   } catch (error) {

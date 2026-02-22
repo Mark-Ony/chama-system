@@ -32,7 +32,7 @@ export default function ContributionsPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [stkLoading, setStkLoading] = useState(false)
-const [stkMessage, setStkMessage] = useState('')
+  const [stkMessage, setStkMessage] = useState('')
   const [form, setForm] = useState({
     member_id: '',
     amount: '',
@@ -75,7 +75,7 @@ const [stkMessage, setStkMessage] = useState('')
   const data = await res.json()
 
   if (data.success) {
-    setStkMessage('✅ M-Pesa prompt sent to member\'s phone!')
+    setStkMessage('M-Pesa prompt sent to member\'s phone!')
   } else {
     setStkMessage(`❌ ${data.error}`)
   }
