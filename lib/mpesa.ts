@@ -39,7 +39,12 @@ export const stkPush = async ({
   const formattedPhone = phone.startsWith('0')
     ? `254${phone.slice(1)}`
     : phone
-
+console.log('Sending to Daraja:', {
+  phone: formattedPhone,
+  amount,
+  callbackUrl: process.env.MPESA_CALLBACK_URL,
+  shortcode: process.env.MPESA_SHORTCODE,
+})
   const res = await fetch(
     'https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest',
     {
@@ -63,6 +68,7 @@ export const stkPush = async ({
       }),
     }
   )
+
 
   return res.json()
 }
