@@ -3,7 +3,8 @@ import { stkPush } from '@/lib/mpesa'
 
 export async function POST(req: NextRequest) {
   try {
-    const { phone, amount, memberId, month } = await req.json()
+    const body = await req.json()
+    const { phone, amount, memberId, month } = body
 
     if (!phone || !amount || !memberId) {
       return NextResponse.json(
@@ -12,27 +13,43 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // memberId might be full UUID — slice safely
+    const reference = memberId.length >= 8 
+      ? `CHAMA-${memberId.slice(0, 8).toUpperCase()}`
+      : `CHAMA-${memberId.toUpperCase()}`
+
     const result = await stkPush({
       phone,
       amount: Number(amount),
-      accountReference: `CHAMA-${memberId.slice(0, 8).toUpperCase()}`,
+      accountReference: reference,
     })
 
-    if (result.ResponseCode === '0') {
+    console.log('Daraja response:', JSON.stringify(result))
+
+    // Daraja success returns ResponseCode "0"
+    if (result?.ResponseCode === '0') {
       return NextResponse.json({
         success: true,
         checkoutRequestId: result.CheckoutRequestID,
         message: 'STK push sent. Ask member to enter M-Pesa PIN.'
       })
-    } else {
-      return NextResponse.json(
-        { error: result.errorMessage || 'STK push failed' },
-        { status: 400 }
-      )
     }
-  } catch (error) {
+
+    // Handle specific Daraja errors
+    const errorMsg = result?.errorMessage 
+      || result?.ResponseDescription 
+      || result?.ResultDesc
+      || 'STK push failed'
+
     return NextResponse.json(
-      { error: 'Something went wrong' },
+      { error: errorMsg },
+      { status: 400 }
+    )
+
+  } catch (error: any) {
+    console.error('STK error:', error)
+    return NextResponse.json(
+      { error: error.message || 'Something went wrong' },
       { status: 500 }
     )
   }
