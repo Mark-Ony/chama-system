@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { sendWhatsApp } from '@/lib/whatsapp'
 
-// Use service role key here — bypasses RLS for server-side writes
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -25,19 +25,19 @@ export async function POST(req: NextRequest) {
     const phone = items.find((i: any) => i.Name === 'PhoneNumber')?.Value?.toString()
 
     // Find member by phone
-    const formattedPhone = `0${phone?.slice(3)}`  // 254712... → 0712...
+    const formattedPhone = `0${phone?.slice(3)}`
     const { data: member } = await supabase
       .from('members')
-      .select('id')
+      .select('id, full_name, phone')
       .eq('phone', formattedPhone)
       .single()
 
     if (!member) {
-      console.log('Member not found for phone:', formattedPhone)
-      return NextResponse.json({ success: false, error: 'Member not found' })
+      console.log('Member not found:', formattedPhone)
+      return NextResponse.json({ success: false })
     }
 
-    // Save contribution automatically
+    // Save contribution
     const month = new Date().toLocaleString('en-KE', {
       month: 'long',
       year: 'numeric'
@@ -53,11 +53,24 @@ export async function POST(req: NextRequest) {
     }])
 
     if (error) {
-      console.error('DB insert error:', error)
+      console.error('DB error:', error)
       return NextResponse.json({ success: false })
     }
 
-    console.log(` Payment saved: KES ${amount} from ${formattedPhone} — ${mpesaCode}`)
+    // 🔔 Send WhatsApp to member
+    await sendWhatsApp({
+      phone: member.phone,
+      message: ` *Chama Payment Confirmed!*\n\nHi ${member.full_name},\n\nYour contribution of *KES ${amount}* has been received.\n\nM-Pesa Code: *${mpesaCode}*\nMonth: ${month}\n\nThank you! 🙏`
+    })
+
+    // 🔔 Send WhatsApp to treasurer
+    const treasurerPhone = process.env.TREASURER_PHONE!
+    await sendWhatsApp({
+      phone: treasurerPhone,
+      message: ` *New Chama Payment!*\n\n${member.full_name} has paid *KES ${amount}*\n\nM-Pesa Code: *${mpesaCode}*\nMonth: ${month}`
+    })
+
+    console.log(`Payment saved and WhatsApp sent: KES ${amount} from ${member.full_name}`)
     return NextResponse.json({ success: true })
 
   } catch (error) {
